@@ -2,9 +2,9 @@
 
 ## Kurulum
     python -m venv venv
-    venv\Scripts\activate        #(Mac/Linux: source venv/bin/activate)
+    venv\Scripts\activate 
     pip install -r requirements.txt
-    playwright install chromium
+    
 
 ## Çalıştırma
     python main.py
