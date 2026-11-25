@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image, ImageDraw, ImageTk
 import parser as ig_parser
-from bot import Bot, durum_oku
+from bot import Bot, durum_oku, HIZ
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -296,6 +296,17 @@ class App(ctk.CTk):
         self.pbox._textbox.tag_bind("u", "<Button-1>", lambda e: self._ac(e, self.pbox))
         self.log = self._kutu(orta, font=self.f_mono); self.log.grid(row=1, column=1, sticky="nsew", padx=6)
 
+        # Hız modu seçici (mevcut palet ve fontlarla uyumlu)
+        h = self._panel(t); h.pack(fill="x", pady=(10, 0))
+        ctk.CTkLabel(h, text="Hız modu", text_color=YAZI2, font=self.f_norm).pack(side="left", padx=(12, 6), pady=10)
+        self.hiz_sec = ctk.CTkSegmentedButton(h, values=list(HIZ), command=self._hiz_degisti, font=self.f_norm,
+                                              fg_color=KART, selected_color=("#d8ceff", ACCENT),
+                                              selected_hover_color=("#c7baff", ACCENT_HOVER),
+                                              unselected_color=KART, unselected_hover_color=KART2, text_color=YAZI)
+        self.hiz_sec.set("Güvenli"); self.hiz_sec.pack(side="left", pady=10)
+        self.hiz_bilgi = ctk.CTkLabel(h, text=HIZ["Güvenli"]["bilgi"], text_color=YAZI2, font=self.f_norm)
+        self.hiz_bilgi.pack(side="left", padx=12)
+
         k = self._panel(t); k.pack(fill="x", pady=(10, 4))
         ctk.CTkLabel(k, text="Oturum limiti", text_color=YAZI2, font=self.f_norm).pack(side="left", padx=(12, 6), pady=10)
         self.limit = ctk.CTkEntry(k, width=70, corner_radius=10, fg_color=KART, border_color=KENAR,
@@ -333,12 +344,18 @@ class App(ctk.CTk):
         self.pbox.configure(state="disabled")
         self._yaz("Liste yüklendi. İptal için 'Tarayıcıyı Aç' > giriş yap > 'İşlemi Başlat'.")
 
+    def _hiz_degisti(self, ad):
+        """Hız modu seçilince bota hemen uygular (çalışırken de geçerli)."""
+        self.bot.hiz_ayarla(ad)
+        self.hiz_bilgi.configure(text=HIZ[ad]["bilgi"])
+
     def _baslat(self):
         if not self.pending: return messagebox.showwarning("Uyarı", "Liste boş: bekleyen istek dosyası seçilmemiş ya da içinden kullanıcı okunamamış.")
         try: lim = int(self.limit.get())
         except ValueError: return messagebox.showwarning("Uyarı", "Limit sayı olmalı.")
         if not (self.bot.thread and self.bot.thread.is_alive()):
             return messagebox.showwarning("Uyarı", "Önce 'Tarayıcıyı Aç' ile giriş yapın.")
+        self.bot.hiz_ayarla(self.hiz_sec.get())
         self.bot.baslat(self.pending, lim)
 
     # ---------- Kuyruk (iş parçacığı -> arayüz) ----------

@@ -21,3 +21,8 @@ Arayüz metinleri Instagram tarafından değişirse bot.py başındaki regex'ler
 ## Tarayıcı notu
 Bot, varsayılan tarayıcın Chrome/Edge/Brave ise onu kullanır (ayrı bir profil klasöründe, uzaktan kontrol portuyla).
 Firefox/Safari varsayılansa kurulu ilk Chromium tabanlı tarayıcı açılır; hiçbiri yoksa Playwright Chromium kullanılır.
+
+## Hız modları
+İptal Botu sekmesinde Güvenli / Dengeli / Hızlı seçilebilir. Güvenli, önceki varsayılan davranışın aynısıdır.
+Dengeli ve Hızlı beklemeleri ve molaları kısaltır, ayrıca işlem sırasında resim/video/font yüklemesini kapatır.
+Hızlı mod hesap kısıtlama riskini artırır; düşük limitle deneyin.

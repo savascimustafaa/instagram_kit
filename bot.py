@@ -20,6 +20,21 @@ ONAY = ONAY = re.compile(r"^(Unfollow|Takibi\s+[Bb]ırak)$", re.I)
 TAKIP = re.compile(r"^(Following|Takiptesin|Takip\s+Ediliyor|Follow|Takip\s+Et|Follow\s+Back|Sen\s+de\s+Takip\s+Et)$", re.I)
 YOK = ("isn't available", "ulaşılamıyor", "Page Not Found", "Sayfa bulunamadı")
 
+# Hız modları: bekleme aralıkları (sn). "Güvenli" mevcut varsayılan değerlerle birebir aynıdır.
+# sayfa: sayfa açıldıktan sonra | hover: tıklamadan önce | tik/tik2: tıklama sonrası | arasi: profiller arası
+# mola_her: kaç işlemde bir uzun mola | mola: uzun mola süresi (sn) | gorsel_engel: resim/video/font yüklemeyi kapat
+HIZ = {
+    "Güvenli": dict(sayfa=(2.0, 4.0), hover=(0.4, 0.8), tik=(1.0, 2.0), tik2=(1.5, 2.5), arasi=(4, 9),
+                    mola_her=(20, 25), mola=(120, 180), gorsel_engel=False,
+                    bilgi="≈12-20 sn/profil · 20-25 işlemde 2-3 dk mola"),
+    "Dengeli": dict(sayfa=(1.2, 2.5), hover=(0.3, 0.6), tik=(0.7, 1.4), tik2=(0.9, 1.7), arasi=(3, 6),
+                    mola_her=(25, 30), mola=(90, 150), gorsel_engel=True,
+                    bilgi="≈8-13 sn/profil · 25-30 işlemde 1,5-2,5 dk mola"),
+    "Hızlı": dict(sayfa=(0.8, 1.6), hover=(0.2, 0.4), tik=(0.4, 0.9), tik2=(0.6, 1.2), arasi=(2, 4),
+                  mola_her=(30, 35), mola=(60, 100), gorsel_engel=True,
+                  bilgi="≈5-9 sn/profil · 30-35 işlemde 1-1,7 dk mola · kısıtlama riski daha yüksek"),
+}
+
 CDP_PORT = 9222
 # Yalnızca CDP destekleyen Chromium tabanlı tarayıcılar
 ADAYLAR = {
@@ -107,6 +122,7 @@ class Bot:
         self.devam_ev = threading.Event()
         self.devam_ev.set()  # set = çalışıyor, clear = duraklatıldı
         self.kullanicilar, self.limit, self.page = [], 100, None
+        self.hiz = HIZ["Güvenli"]  # seçili hız modu
         self.thread = None
 
     # ---- Dışarıdan kontrol ----
@@ -122,6 +138,11 @@ class Bot:
     def baslat(self, kullanicilar, limit):
         self.kullanicilar, self.limit = kullanicilar, limit
         self.baslat_ev.set()
+
+    def hiz_ayarla(self, ad):
+        """Hız modunu değiştirir; bekleme süreleri her adımda self.hiz'den okunduğu için çalışırken de geçerlidir."""
+        self.hiz = HIZ.get(ad, HIZ["Güvenli"])
+        self.log(f"⚙ Hız modu: {ad}")
 
     def duraklat_degistir(self):
         if self.devam_ev.is_set():
@@ -147,6 +168,17 @@ class Bot:
 
     def _insansi(self, a=2.5, b=5.5):
         self._bekle(random.uniform(a, b))
+
+    def _t(self, anahtar):
+        """Seçili hız modundaki aralıkta rastgele bekle."""
+        self._insansi(*self.hiz[anahtar])
+
+    def _engelle(self, route):
+        """Resim, video ve fontları yüklemeyerek sayfa açılışını hızlandırır."""
+        if route.request.resource_type in ("image", "media", "font"):
+            route.abort()
+        else:
+            route.continue_()
 
     def _calis(self):
         try:
@@ -198,8 +230,13 @@ class Bot:
         durum = durum_oku()
         liste = [u for u in self.kullanicilar if u not in durum]
         self.log(f"{len(self.kullanicilar) - len(liste)} profil atlandı (önceden işlenmiş). Kalan: {len(liste)}")
-        islem, mola_siniri = 0, random.randint(20, 25)
+        islem, mola_siniri = 0, random.randint(*self.hiz["mola_her"])
         toplam = min(len(liste), self.limit)
+
+        # Görsel engelleme yalnızca işlem sırasında açık (giriş/2FA ekranları etkilenmez)
+        engelli = self.hiz["gorsel_engel"]
+        if engelli:
+            self.page.route("**/*", self._engelle)
 
         for u in liste:
             if self.durdur_ev.is_set() or islem >= self.limit:
@@ -213,17 +250,22 @@ class Bot:
             self.ilerleme(islem / max(toplam, 1))
 
             if islem >= mola_siniri and islem < toplam:
-                s = random.randint(120, 180)
+                s = random.randint(*self.hiz["mola"])
                 self.log(f"☕ Uzun mola: {s} sn")
                 for k in range(s, 0, -10):
                     if self.durdur_ev.is_set():
                         break
                     self.log(f"   mola bitimine {k} sn...")
                     self._bekle(min(10, k))
-                mola_siniri += random.randint(20, 25)
+                mola_siniri += random.randint(*self.hiz["mola_her"])
             else:
-                self._insansi(4, 9)
+                self._t("arasi")
 
+        if engelli:
+            try:
+                self.page.unroute("**/*", self._engelle)
+            except Exception:
+                pass
         self.log(f"Bitti. Bu oturumda {islem} profil işlendi.")
 
     def _profil(self, u):
@@ -236,7 +278,7 @@ class Bot:
                 self.page.locator("header, main").first.wait_for(state="visible", timeout=10000)
             except Exception:
                 pass
-            self._insansi(2.0, 4.0)
+            self._t("sayfa")
 
             govde = self.page.inner_text("body")
             if any(k in govde for k in YOK):
@@ -251,9 +293,9 @@ class Bot:
                 self.page.bring_to_front()
                 bekleyen_btn.scroll_into_view_if_needed()
                 bekleyen_btn.hover()
-                self._insansi(0.4, 0.8)
+                self._t("hover")
                 bekleyen_btn.click()
-                self._insansi(1.0, 2.0)
+                self._t("tik")
 
                 # Onay penceresindeki "Takibi Bırak" / "Unfollow" butonunu bekle (button, div veya doğrudan metin)
                 onay_btn = self.page.locator("button, div[role='button']").filter(has_text=ONAY).first
@@ -263,17 +305,17 @@ class Bot:
                 try:
                     onay_btn.wait_for(state="visible", timeout=6000)
                     onay_btn.click()
-                    self._insansi(1.5, 2.5)
+                    self._t("tik2")
                     self.log("   ✅ istek geri çekildi")
                     return "iptal"
                 except Exception:
                     # İlk tıklama pencereyi açmadıysa içteki metne bir kez daha tıkla
                     bekleyen_btn.locator("div[dir='auto']").first.click()
-                    self._insansi(1.0, 2.0)
+                    self._t("tik")
                     onay_btn = self.page.get_by_text(ONAY).first
                     if onay_btn.count() and onay_btn.is_visible():
                         onay_btn.click()
-                        self._insansi(1.5, 2.5)
+                        self._t("tik2")
                         self.log("   ✅ istek geri çekildi")
                         return "iptal"
 
