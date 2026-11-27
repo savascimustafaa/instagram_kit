@@ -40,12 +40,10 @@ CDP_PORT = 9222
 ADAYLAR = {
     "chrome": ["chrome.exe", "google-chrome", "google-chrome-stable", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
     "brave": ["brave.exe", "brave-browser", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"],
-    "edge": ["msedge.exe", "microsoft-edge", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
 }
 WIN_DIZINLER = [os.environ.get(k, "") for k in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")]
 WIN_ALT = {
     "chrome.exe": r"Google\Chrome\Application\chrome.exe",
-    "msedge.exe": r"Microsoft\Edge\Application\msedge.exe",
     "brave.exe": r"BraveSoftware\Brave-Browser\Application\brave.exe",
 }
 
@@ -68,7 +66,7 @@ def varsayilan_tarayici():
             ).stdout.lower()
         else:
             prog = ""
-        for ad, anahtar in (("brave", "brave"), ("edge", "edge"), ("msedge", "edge"), ("chrome", "chrome"), ("opera", "opera"), ("firefox", "firefox")):
+        for ad, anahtar in (("brave", "brave"),  ("chrome", "chrome"), ("opera", "opera"), ("firefox", "firefox")):
             if ad in prog:
                 return anahtar
     except Exception:
